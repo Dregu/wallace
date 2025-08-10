@@ -6,6 +6,9 @@ static double start_x;
 static double start_y;
 static double prev_x;
 static double prev_y;
+static const char *colors[6] = {"#E40303", "#FF8C00", "#FFED00",
+                                "#008026", "#24408E", "#732982"};
+static int color_index = 0;
 
 static void clear_surface(void) {
   cairo_t *cr = cairo_create(surface);
@@ -35,12 +38,14 @@ static void draw_cb(GtkDrawingArea *drawing_area, cairo_t *cr, int width,
 }
 
 static void draw_brush(GtkWidget *widget, double x, double y) {
+  GdkRGBA color;
+  gdk_rgba_parse(&color, colors[color_index]);
   cairo_t *cr = cairo_create(surface);
   cairo_move_to(cr, prev_x + 2, prev_y + 2);
   cairo_line_to(cr, x + 2, y + 2);
   cairo_set_line_width(cr, 4.0);
   cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
-  cairo_set_source_rgb(cr, 1, 0, 0);
+  cairo_set_source_rgba(cr, color.red, color.green, color.blue, color.alpha);
   cairo_stroke(cr);
   cairo_destroy(cr);
   gtk_widget_queue_draw(widget);
@@ -73,6 +78,15 @@ static void pressed(GtkGestureClick *gesture, int n_press, double x, double y,
   gtk_widget_queue_draw(area);
 }
 
+static void scrolled(GtkEventControllerScroll *scroll, double dx, double dy,
+                     GtkWidget *area) {
+  if (dy < 0)
+    color_index++;
+  if (dy > 0)
+    color_index--;
+  color_index = (color_index + 6) % 6;
+}
+
 static void close_window(void) {
   if (surface)
     cairo_surface_destroy(surface);
@@ -101,22 +115,29 @@ window { background: rgba(0, 0, 0, 0); }
   GtkWidget *frame = gtk_frame_new(NULL);
   gtk_window_set_child(GTK_WINDOW(window), frame);
   GtkWidget *drawing_area = gtk_drawing_area_new();
-  gtk_widget_set_size_request(drawing_area, 640, 480);
   gtk_frame_set_child(GTK_FRAME(frame), drawing_area);
   gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, NULL,
                                  NULL);
   g_signal_connect_after(drawing_area, "resize", G_CALLBACK(resize_cb), NULL);
+
   GtkGesture *drag = gtk_gesture_drag_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(drag), GDK_BUTTON_PRIMARY);
   gtk_widget_add_controller(drawing_area, GTK_EVENT_CONTROLLER(drag));
   g_signal_connect(drag, "drag-begin", G_CALLBACK(drag_begin), drawing_area);
   g_signal_connect(drag, "drag-update", G_CALLBACK(drag_update), drawing_area);
   g_signal_connect(drag, "drag-end", G_CALLBACK(drag_end), drawing_area);
+
   GtkGesture *press = gtk_gesture_click_new();
   gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(press),
                                 GDK_BUTTON_SECONDARY);
   gtk_widget_add_controller(drawing_area, GTK_EVENT_CONTROLLER(press));
   g_signal_connect(press, "pressed", G_CALLBACK(pressed), drawing_area);
+
+  GtkEventController *scroll =
+      gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES);
+  gtk_widget_add_controller(drawing_area, GTK_EVENT_CONTROLLER(scroll));
+  g_signal_connect(scroll, "scroll", G_CALLBACK(scrolled), drawing_area);
+
   gtk_widget_set_cursor_from_name(drawing_area, "crosshair");
   gtk_window_present(window);
 }
