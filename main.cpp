@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
 #include <gtk4-layer-shell.h>
+#include <signal.h>
 
 static cairo_surface_t *surface = NULL;
 static double start_x;
@@ -9,6 +10,19 @@ static double prev_y;
 static const char *colors[6] = {"#E40303", "#FF8C00", "#FFED00",
                                 "#008026", "#24408E", "#732982"};
 static int color_index = 0;
+
+GtkWindow *window;
+
+static void toggle_layer(int sig) {
+  if (gtk_layer_get_layer(window) == GTK_LAYER_SHELL_LAYER_BOTTOM) {
+    gtk_layer_set_keyboard_mode(window,
+                                GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
+    gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
+  } else {
+    gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
+    gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_BOTTOM);
+  }
+}
 
 static void clear_surface(void) {
   cairo_t *cr = cairo_create(surface);
@@ -93,7 +107,7 @@ static void close_window(void) {
 }
 
 static void activate(GtkApplication *app, [[maybe_unused]] gpointer user_data) {
-  GtkWindow *window = GTK_WINDOW(gtk_application_window_new(app));
+  window = GTK_WINDOW(gtk_application_window_new(app));
   gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
   GtkCssProvider *provider = gtk_css_provider_new();
   gtk_css_provider_load_from_string(provider, R""""(
@@ -139,12 +153,18 @@ window { background: rgba(0, 0, 0, 0); }
   g_signal_connect(scroll, "scroll", G_CALLBACK(scrolled), drawing_area);
 
   gtk_widget_set_cursor_from_name(drawing_area, "crosshair");
+
+  auto *surface =
+      gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(window)));
+  gdk_surface_set_input_region(surface, NULL);
+  gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
+
   gtk_window_present(window);
 }
 
 int main(int argc, char *argv[]) {
-  GtkApplication *app =
-      gtk_application_new("org.gtk.example", G_APPLICATION_DEFAULT_FLAGS);
+  signal(SIGUSR1, toggle_layer);
+  GtkApplication *app = gtk_application_new(NULL, G_APPLICATION_DEFAULT_FLAGS);
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
   int status = g_application_run(G_APPLICATION(app), argc, argv);
   g_object_unref(app);
