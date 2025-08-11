@@ -13,17 +13,6 @@ static int color_index = 0;
 
 GtkWindow *window;
 
-static void toggle_layer(int sig) {
-  if (gtk_layer_get_layer(window) == GTK_LAYER_SHELL_LAYER_BOTTOM) {
-    gtk_layer_set_keyboard_mode(window,
-                                GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
-    gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
-  } else {
-    gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
-    gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_BOTTOM);
-  }
-}
-
 static void clear_surface(void) {
   cairo_t *cr = cairo_create(surface);
   cairo_set_source_rgba(cr, 1, 1, 1, 0);
@@ -106,6 +95,21 @@ static void close_window(void) {
     cairo_surface_destroy(surface);
 }
 
+static void signal_handler(int sig) {
+  if (sig == SIGUSR1) {
+    if (gtk_layer_get_layer(window) == GTK_LAYER_SHELL_LAYER_BOTTOM) {
+      gtk_layer_set_keyboard_mode(window,
+                                  GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
+      gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
+    } else {
+      gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_NONE);
+      gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_BOTTOM);
+    }
+  } else if (sig == SIGTERM) {
+    gtk_window_destroy(window);
+  }
+}
+
 static void activate(GtkApplication *app, [[maybe_unused]] gpointer user_data) {
   window = GTK_WINDOW(gtk_application_window_new(app));
   gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
@@ -153,17 +157,14 @@ window { background: rgba(0, 0, 0, 0); }
   g_signal_connect(scroll, "scroll", G_CALLBACK(scrolled), drawing_area);
 
   gtk_widget_set_cursor_from_name(drawing_area, "crosshair");
-
-  auto *surface =
-      gtk_native_get_surface(gtk_widget_get_native(GTK_WIDGET(window)));
-  gdk_surface_set_input_region(surface, NULL);
   gtk_layer_set_keyboard_mode(window, GTK_LAYER_SHELL_KEYBOARD_MODE_EXCLUSIVE);
 
   gtk_window_present(window);
 }
 
 int main(int argc, char *argv[]) {
-  signal(SIGUSR1, toggle_layer);
+  signal(SIGUSR1, signal_handler);
+  signal(SIGTERM, signal_handler);
   GtkApplication *app = gtk_application_new(NULL, G_APPLICATION_DEFAULT_FLAGS);
   g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
   int status = g_application_run(G_APPLICATION(app), argc, argv);
