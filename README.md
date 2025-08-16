@@ -1,18 +1,12 @@
 # Wallace
 
-Wayland layer shell version of Gromit-MPX.
+Wayland gtk4-layer-shell version of Gromit-MPX.
 
 ## Usage
-
-- Mouse left: draw stuff
-- Mouse right: clear drawing
-- Mouse wheel: change color
+- `GSK_RENDERER=cairo wallace` starts faster?
+- Mouse Left: draw stuff
+- Mouse Right: eraser
+- Mouse Middle: clear current monitor
+- Mouse Wheel: change color
+- Escape: exit
 - `pkill -SIGUSR1 wallace`: toggle bottom/overlay layer
-
-## TODO
-
-- `-a` all monitors
-- `-b` start on bottom layer
-- `-c` custom color
-- `-e` cover exclusive zones too
-- `-h` help
