@@ -1,8 +1,9 @@
 # Wallace
 
-Simple wayland gtk4-layer-shell clone of Gromit-MPX.
+Simple Wayland gtk4-layer-shell clone of Gromit-MPX.
 
 ## Usage
+
 - `GSK_RENDERER=cairo wallace` starts faster?
 - `pkill -SIGUSR1 wallace`: toggle bottom/overlay layer
 - `pkill -SIGUSR2 wallace`: toggle drawing/passthrough mode
@@ -11,3 +12,10 @@ Simple wayland gtk4-layer-shell clone of Gromit-MPX.
 - Mouse Middle: clear current monitor
 - Mouse Wheel: change color
 - Escape: exit
+
+## Build
+
+```
+cmake -GNinja -DCMAKE_BUILD_TYPE=Release -Bbuild
+cmake --build build --config Release
+```
