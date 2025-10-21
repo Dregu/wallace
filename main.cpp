@@ -61,8 +61,8 @@ static void draw_brush(GtkWidget* widget, double x, double y)
     GdkRGBA color;
     gdk_rgba_parse(&color, colors[color_index]);
     cairo_t* cr = cairo_create(surface[widget]);
-    cairo_move_to(cr, prev_x + 2, prev_y + 2);
-    cairo_line_to(cr, x + 2, y + 2);
+    cairo_move_to(cr, prev_x, prev_y);
+    cairo_line_to(cr, x, y);
     cairo_set_line_width(cr, 4.0);
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
     cairo_set_source_rgba(cr, color.red, color.green, color.blue, color.alpha);
@@ -78,8 +78,8 @@ static void erase_brush(GtkWidget* widget, double x, double y)
     GdkRGBA color;
     gdk_rgba_parse(&color, colors[color_index]);
     cairo_t* cr = cairo_create(surface[widget]);
-    cairo_move_to(cr, prev_x + 2, prev_y + 2);
-    cairo_line_to(cr, x + 2, y + 2);
+    cairo_move_to(cr, prev_x, prev_y);
+    cairo_line_to(cr, x, y);
     cairo_set_line_width(cr, 60.0);
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
@@ -238,8 +238,8 @@ window.pass { opacity: 0.33; }
             gtk_layer_set_namespace(window, "wallace");
             gtk_layer_set_monitor(window, mon);
             gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
-            gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
-            gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
+            // gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
+            // gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
             GdkRectangle geometry;
             gdk_monitor_get_geometry(mon, &geometry);
             gtk_window_set_default_size(window, geometry.width, geometry.height);
