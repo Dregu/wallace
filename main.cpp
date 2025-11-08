@@ -6,6 +6,8 @@
 #include <gtk4-layer-shell.h>
 #include <signal.h>
 
+static double draw_x = -1;
+static double draw_y = -1;
 static double prev_x = -1;
 static double prev_y = -1;
 static const char* colors[6] = {"#E40303", "#FF8C00", "#FFED00", "#008026", "#24408E", "#732982"};
@@ -147,6 +149,29 @@ static void scrolled(GtkEventControllerScroll* scroll, double dx, double dy, Gtk
     color_index = (color_index + 6) % 6;
 }
 
+static void drag_begin(GtkGestureDrag* gesture, double x, double y, GtkWidget* area)
+{
+    draw_x = x;
+    draw_y = y;
+    prev_x = x;
+    prev_y = y;
+    drawing = true;
+    erasing = false;
+    draw_brush(area, x, y);
+}
+
+static void drag_end(GtkGestureDrag* gesture, double x, double y, GtkWidget* area)
+{
+    drawing = false;
+}
+
+static void drag_update(GtkGestureDrag* gesture, double x, double y, gpointer data)
+{
+    auto area = reinterpret_cast<GtkWidget*>(data);
+    if (drawing)
+        draw_brush(area, draw_x + x, draw_y + y);
+}
+
 static void signal_handler(int sig)
 {
     static const auto empty_region = cairo_region_create();
@@ -251,6 +276,14 @@ window.pass { opacity: 0.33; }
         gtk_window_set_child(GTK_WINDOW(window), drawing_area);
         gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, NULL, NULL);
         g_signal_connect_after(drawing_area, "resize", G_CALLBACK(resize_cb), NULL);
+
+        GtkGesture* draw = gtk_gesture_drag_new();
+        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(draw), GDK_BUTTON_PRIMARY);
+        gtk_gesture_single_set_touch_only(GTK_GESTURE_SINGLE(draw), true);
+        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(draw));
+        g_signal_connect(draw, "drag-begin", G_CALLBACK(drag_begin), drawing_area);
+        g_signal_connect(draw, "drag-update", G_CALLBACK(drag_update), drawing_area);
+        g_signal_connect(draw, "drag-end", G_CALLBACK(drag_end), drawing_area);
 
         auto* motion = gtk_event_controller_motion_new();
         gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(motion));
