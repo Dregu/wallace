@@ -13,9 +13,10 @@ Simple Wayland gtk4-layer-shell clone of Gromit-MPX.
 - Mouse Wheel: change color
 - Escape: exit
 
-## Build
+## Build & Install
 
 ```
 cmake -GNinja -DCMAKE_BUILD_TYPE=Release -Bbuild
 cmake --build build --config Release
+sudo cmake --install build
 ```

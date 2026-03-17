@@ -8,3 +8,5 @@ pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4)
 
 add_executable(wallace main.cpp)
 target_link_libraries(wallace PRIVATE PkgConfig::GTK4 PkgConfig::GTKLS)
+
+install(TARGETS wallace)
