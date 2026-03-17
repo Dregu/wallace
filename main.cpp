@@ -103,9 +103,7 @@ static void pressed_left(GtkGestureClick* gesture, int n_press, double x, double
 }
 
 static void released_left(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
-{
-    drawing = false;
-}
+{ drawing = false; }
 
 static void pressed_right(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
 {
@@ -161,9 +159,7 @@ static void drag_begin(GtkGestureDrag* gesture, double x, double y, GtkWidget* a
 }
 
 static void drag_end(GtkGestureDrag* gesture, double x, double y, GtkWidget* area)
-{
-    drawing = false;
-}
+{ drawing = false; }
 
 static void drag_update(GtkGestureDrag* gesture, double x, double y, gpointer data)
 {
@@ -200,18 +196,18 @@ static void signal_handler(int sig)
             {
                 gdk_surface_set_input_region(surf, NULL);
                 gtk_widget_remove_css_class(GTK_WIDGET(window), "pass");
-                gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
-                gtk_widget_set_visible(GTK_WIDGET(window), TRUE);
+                // gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
+                // gtk_widget_set_visible(GTK_WIDGET(window), TRUE);
             }
             else
             {
                 gdk_surface_set_input_region(surf, empty_region);
                 gtk_widget_add_css_class(GTK_WIDGET(window), "pass");
-                gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
-                gtk_widget_set_visible(GTK_WIDGET(window), TRUE);
+                // gtk_widget_set_visible(GTK_WIDGET(window), FALSE);
+                // gtk_widget_set_visible(GTK_WIDGET(window), TRUE);
             }
-            passthrough ^= true;
         }
+        passthrough ^= true;
     }
     else if (sig == SIGTERM)
     {
