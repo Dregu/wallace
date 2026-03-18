@@ -259,8 +259,11 @@ window.pass { opacity: 0.33; }
             gtk_layer_set_namespace(window, "wallace");
             gtk_layer_set_monitor(window, mon);
             gtk_layer_set_layer(window, GTK_LAYER_SHELL_LAYER_OVERLAY);
-            // gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
-            // gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
+            gtk_layer_set_exclusive_zone(window, -1);
+            gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_TOP, TRUE);
+            gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_BOTTOM, TRUE);
+            gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
+            gtk_layer_set_anchor(window, GTK_LAYER_SHELL_EDGE_RIGHT, TRUE);
             GdkRectangle geometry;
             gdk_monitor_get_geometry(mon, &geometry);
             gtk_window_set_default_size(window, geometry.width, geometry.height);
