@@ -6,19 +6,21 @@
 #include <gtk4-layer-shell.h>
 #include <signal.h>
 
-static double draw_x = -1;
-static double draw_y = -1;
-static double prev_x = -1;
-static double prev_y = -1;
-static const char* colors[6] = {"#E40303", "#FF8C00", "#FFED00", "#008026", "#24408E", "#732982"};
+#define COLORS 6
+
+static std::map<int, double> draw_x;
+static std::map<int, double> draw_y;
+static std::map<int, double> prev_x;
+static std::map<int, double> prev_y;
+static std::map<int, bool> drawing;
+static std::map<int, bool> erasing;
+static const char* colors[COLORS] = {"#E40303", "#FF8C00", "#FFED00", "#008026", "#24408E", "#732982"};
 static int color_index = 0;
 
 GtkApplication* app;
 static std::vector<GtkWindow*> windows;
 static std::map<GtkWidget*, cairo_surface_t*> surface;
 static bool passthrough = false;
-static bool drawing = false;
-static bool erasing = false;
 
 static void clear_surface(GtkWidget* widget)
 {
@@ -58,12 +60,13 @@ static void draw_cb(GtkDrawingArea* drawing_area, cairo_t* cr, int width, int he
     cairo_paint(cr);
 }
 
-static void draw_brush(GtkWidget* widget, double x, double y)
+static void draw_brush(double x, double y, int i, GtkWidget* widget)
 {
     GdkRGBA color;
-    gdk_rgba_parse(&color, colors[color_index]);
+    int idx = (color_index + (i > 0 ? i - 1 + drawing[0] : 0)) % COLORS;
+    gdk_rgba_parse(&color, colors[idx]);
     cairo_t* cr = cairo_create(surface[widget]);
-    cairo_move_to(cr, prev_x, prev_y);
+    cairo_move_to(cr, prev_x[i], prev_y[i]);
     cairo_line_to(cr, x, y);
     cairo_set_line_width(cr, 4.0);
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
@@ -71,16 +74,16 @@ static void draw_brush(GtkWidget* widget, double x, double y)
     cairo_stroke(cr);
     cairo_destroy(cr);
     gtk_widget_queue_draw(widget);
-    prev_x = x;
-    prev_y = y;
+    prev_x[i] = x;
+    prev_y[i] = y;
 }
 
-static void erase_brush(GtkWidget* widget, double x, double y)
+static void erase_brush(double x, double y, int i, GtkWidget* widget)
 {
     GdkRGBA color;
     gdk_rgba_parse(&color, colors[color_index]);
     cairo_t* cr = cairo_create(surface[widget]);
-    cairo_move_to(cr, prev_x, prev_y);
+    cairo_move_to(cr, prev_x[i], prev_y[i]);
     cairo_line_to(cr, x, y);
     cairo_set_line_width(cr, 60.0);
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
@@ -89,53 +92,52 @@ static void erase_brush(GtkWidget* widget, double x, double y)
     cairo_stroke(cr);
     cairo_destroy(cr);
     gtk_widget_queue_draw(widget);
-    prev_x = x;
-    prev_y = y;
+    prev_x[i] = x;
+    prev_y[i] = y;
 }
 
-static void pressed_left(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
+static void pressed_left(double x, double y, GtkWidget* area)
 {
-    prev_x = x;
-    prev_y = y;
-    drawing = true;
-    erasing = false;
-    draw_brush(area, x, y);
+    prev_x[0] = x;
+    prev_y[0] = y;
+    drawing[0] = true;
+    erasing[0] = false;
+    draw_brush(x, y, 0, area);
 }
 
-static void released_left(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
-{ drawing = false; }
+static void released_left(double x, double y, GtkWidget* area)
+{ drawing[0] = false; }
 
-static void pressed_right(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
+static void pressed_right(double x, double y, GtkWidget* area)
 {
-    prev_x = x;
-    prev_y = y;
-    erasing = true;
-    drawing = false;
-    erase_brush(area, x, y);
+    prev_x[0] = x;
+    prev_y[0] = y;
+    erasing[0] = true;
+    drawing[0] = false;
+    erase_brush(x, y, 0, area);
     for (auto window : windows)
         gtk_widget_set_cursor_from_name(GTK_WIDGET(window), "not-allowed");
 }
 
-static void released_right(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
+static void released_right(double x, double y, GtkWidget* area)
 {
-    erasing = false;
+    erasing[0] = false;
     for (auto window : windows)
         gtk_widget_set_cursor_from_name(GTK_WIDGET(window), "crosshair");
 }
 
-static void pressed_middle(GtkGestureClick* gesture, int n_press, double x, double y, GtkWidget* area)
+static void pressed_middle(double x, double y, GtkWidget* area)
 {
     clear_surface(area);
     gtk_widget_queue_draw(area);
 }
 
-static void on_motion(GtkEventControllerMotion* self, double x, double y, gpointer data)
+static void draw_update(double x, double y, int i, GtkWidget* area)
 {
-    auto area = reinterpret_cast<GtkWidget*>(data);
-    if (drawing)
-        draw_brush(area, x, y);
-    else if (erasing)
-        erase_brush(area, x, y);
+    if (drawing[i])
+        draw_brush(x, y, i, area);
+    else if (erasing[i])
+        erase_brush(x, y, i, area);
 }
 
 static void scrolled(GtkEventControllerScroll* scroll, double dx, double dy, GtkWidget* area)
@@ -144,28 +146,73 @@ static void scrolled(GtkEventControllerScroll* scroll, double dx, double dy, Gtk
         color_index++;
     if (dy > 0)
         color_index--;
-    color_index = (color_index + 6) % 6;
+    color_index = (color_index + COLORS) % COLORS;
 }
 
-static void drag_begin(GtkGestureDrag* gesture, double x, double y, GtkWidget* area)
+static void touch_begin(double x, double y, int i, GtkWidget* area)
 {
-    draw_x = x;
-    draw_y = y;
-    prev_x = x;
-    prev_y = y;
-    drawing = true;
-    erasing = false;
-    draw_brush(area, x, y);
+    draw_x[i] = x;
+    draw_y[i] = y;
+    prev_x[i] = x;
+    prev_y[i] = y;
+    drawing[i] = true;
+    erasing[i] = false;
+    draw_brush(x, y, i, area);
 }
 
-static void drag_end(GtkGestureDrag* gesture, double x, double y, GtkWidget* area)
-{ drawing = false; }
+static void touch_end(double x, double y, int i, GtkWidget* area)
+{ drawing[i] = false; }
 
-static void drag_update(GtkGestureDrag* gesture, double x, double y, gpointer data)
+static void touch_update(double x, double y, int i, GtkWidget* area)
 {
-    auto area = reinterpret_cast<GtkWidget*>(data);
-    if (drawing)
-        draw_brush(area, draw_x + x, draw_y + y);
+    if (!drawing[i])
+        touch_begin(x, y, i, area);
+    else
+        draw_brush(x, y, i, area);
+}
+
+static void raw_update(GtkEventController* controller, GdkEvent* event, GtkWidget* area)
+{
+    auto type = gdk_event_get_event_type(event);
+    double x, y;
+    if (type == GDK_TOUCH_BEGIN || type == GDK_TOUCH_UPDATE | type == GDK_TOUCH_END)
+    {
+        auto seq = gdk_event_get_event_sequence(event);
+        uintptr_t i = (uintptr_t)seq;
+        gdk_event_get_position(event, &x, &y);
+        if (type == GDK_TOUCH_BEGIN)
+            touch_begin(x, y, i, area);
+        else if (type == GDK_TOUCH_END)
+            touch_end(x, y, i, area);
+        else
+            touch_update(x, y, i, area);
+        return;
+    }
+    else if (type == GDK_BUTTON_PRESS)
+    {
+        gdk_event_get_position(event, &x, &y);
+        auto button = gdk_button_event_get_button(event);
+        if (button == GDK_BUTTON_PRIMARY)
+            pressed_left(x, y, area);
+        else if (button == GDK_BUTTON_SECONDARY)
+            pressed_right(x, y, area);
+        else if (button == GDK_BUTTON_MIDDLE)
+            pressed_middle(x, y, area);
+    }
+    else if (type == GDK_BUTTON_RELEASE)
+    {
+        gdk_event_get_position(event, &x, &y);
+        auto button = gdk_button_event_get_button(event);
+        if (button == GDK_BUTTON_PRIMARY)
+            released_left(x, y, area);
+        else if (button == GDK_BUTTON_SECONDARY)
+            released_right(x, y, area);
+    }
+    else if (type == GDK_MOTION_NOTIFY)
+    {
+        gdk_event_get_position(event, &x, &y);
+        draw_update(x, y, 0, area);
+    }
 }
 
 static void signal_handler(int sig)
@@ -276,42 +323,9 @@ window.pass { opacity: 0.33; }
         gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, NULL, NULL);
         g_signal_connect_after(drawing_area, "resize", G_CALLBACK(resize_cb), NULL);
 
-        GtkGesture* draw = gtk_gesture_drag_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(draw), GDK_BUTTON_PRIMARY);
-        gtk_gesture_single_set_touch_only(GTK_GESTURE_SINGLE(draw), true);
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(draw));
-        g_signal_connect(draw, "drag-begin", G_CALLBACK(drag_begin), drawing_area);
-        g_signal_connect(draw, "drag-update", G_CALLBACK(drag_update), drawing_area);
-        g_signal_connect(draw, "drag-end", G_CALLBACK(drag_end), drawing_area);
-
-        auto* motion = gtk_event_controller_motion_new();
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(motion));
-        g_signal_connect_after(motion, "motion", G_CALLBACK(on_motion), drawing_area);
-
-        GtkGesture* press = gtk_gesture_click_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(press), GDK_BUTTON_PRIMARY);
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(press));
-        g_signal_connect_after(press, "pressed", G_CALLBACK(pressed_left), drawing_area);
-
-        GtkGesture* press2 = gtk_gesture_click_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(press2), GDK_BUTTON_SECONDARY);
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(press2));
-        g_signal_connect_after(press2, "pressed", G_CALLBACK(pressed_right), drawing_area);
-
-        GtkGesture* press3 = gtk_gesture_click_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(press3), GDK_BUTTON_MIDDLE);
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(press3));
-        g_signal_connect_after(press3, "pressed", G_CALLBACK(pressed_middle), drawing_area);
-
-        GtkGesture* release = gtk_gesture_click_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(release), GDK_BUTTON_PRIMARY);
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(release));
-        g_signal_connect_after(release, "released", G_CALLBACK(released_left), drawing_area);
-
-        GtkGesture* release2 = gtk_gesture_click_new();
-        gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(release2), GDK_BUTTON_SECONDARY);
-        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(release2));
-        g_signal_connect_after(release2, "released", G_CALLBACK(released_right), drawing_area);
+        auto* legacy = gtk_event_controller_legacy_new();
+        gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(legacy));
+        g_signal_connect(legacy, "event", G_CALLBACK(raw_update), drawing_area);
 
         GtkEventController* scroll = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES);
         gtk_widget_add_controller(GTK_WIDGET(window), GTK_EVENT_CONTROLLER(scroll));
